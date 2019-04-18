@@ -101,8 +101,6 @@ impl PlaceMessage
 }
 
 impl Message for PlaceMessage
-//where
-//    T: AsRef<[u8]>,
 {
     fn get_type(&self) -> MessageType {
         MessageType::Place
