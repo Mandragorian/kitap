@@ -24,7 +24,8 @@ use crate::hash::{KitapHasher, KitapHash};
 pub type BoxedFuture<T, E> = Box<dyn Future<Item = T, Error = E> + Send>;
 
 #[derive(Debug)]
-pub struct SharedBuffer<T: AsRef<[u8]>>(Arc<T>);
+/// A wrapper around AsRev<[u8]> object that are enclosed in an Arc
+pub struct SharedBuffer<T>(Arc<T>);
 
 impl<T> SharedBuffer<T>
 where
@@ -44,6 +45,7 @@ where
     }
 }
 
+/// Shortcut function to create a connection to a particular address
 pub fn connect(
     addr: SocketAddr,
 ) -> impl Future<Item = (ReadHalf<TcpStream>, WriteHalf<TcpStream>), Error = ()> {
@@ -52,6 +54,7 @@ pub fn connect(
         .map(|s| s.split())
 }
 
+/// Sets logging up for this project
 pub fn setup_logging(verbosity: u64, logfile: Option<&str>) -> Result<(), fern::InitError> {
     let mut base_config = fern::Dispatch::new();
 
@@ -103,6 +106,8 @@ pub fn setup_logging(verbosity: u64, logfile: Option<&str>) -> Result<(), fern::
     Ok(())
 }
 
+
+/// Creates the base cli interface that is common in both client and server
 pub fn create_base_app(name: &str) -> App<'static, 'static> {
     App::new(name)
         .arg(
@@ -135,11 +140,13 @@ pub fn create_base_app(name: &str) -> App<'static, 'static> {
 
 }
 
+/// Read a file in chunks of 1024 bytes
 pub fn file_chunks(filename: &str) -> Result<IntoChunks<Bytes<BufReader<File>>>, String> {
     let f = File::open(filename).or(Err(format!("Could not open {}", filename)))?;
     Ok(BufReader::new(f).bytes().chunks(1024))
 }
 
+/// Reads the contents of a file in chunks, feeds them in a hasher one by one and returns the hash
 pub fn hash_file(filename: &str) -> Result<KitapHash, String> {
     let mut hasher = KitapHasher::new();
     let reader = file_chunks(filename)?;//?.bytes().chunks(1024);

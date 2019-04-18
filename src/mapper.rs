@@ -59,10 +59,15 @@ where
 }
 
 #[derive(Debug)]
+/// Shared state between threads.
+///
+/// The state is shared by message passing. It is preserved as a HashMap that uses 
+/// hashable objects as strings.
 pub struct Mapper<K, T>
 where
     K: std::hash::Hash + std::cmp::Eq,
 {
+
     map: Option<HashMap<K, Arc<T>>>,
     sender: Sender<RequestMessage<K, T>>,
     receiver: Option<Receiver<RequestMessage<K, T>>>,
@@ -83,7 +88,8 @@ where
         }
     }
 
-    pub fn owned_insert(&mut self, k: K, t: T) -> Result<(), String> {
+    /// Set the value of a key while the HashMap is still owned by the mapper.
+    pub fn owned_set(&mut self, k: K, t: T) -> Result<(), String> {
         match self.map {
             Some(ref mut m) => {
                 m.insert(k, Arc::new(t));
@@ -93,6 +99,7 @@ where
         }
     }
 
+    /// Get the value of a key while the HashMap is still owned by the mapper.
     pub fn owned_get(&self, k: &K) -> Result<Option<&Arc<T>>, String> {
         match self.map {
             Some(ref m) => {
@@ -102,6 +109,7 @@ where
         }
     }
 
+    /// Send a message to the mapper
     fn send_request(&self, contents: Contents<K, T>) -> impl Future< Item = MapperReply<T>, Error = String> {
         let (snd, rcv) = mpsc::channel::<MapperReply<T>>(1);
         let msg = RequestMessage{contents, snd};
@@ -115,16 +123,22 @@ where
             }).map_err(|e| e.to_string())
     }
 
+    /// Get the value of a key after the mapper thread has been spawned.
     pub fn get(&self, key: K) -> impl Future< Item = MapperReply<T>, Error = String> {
         let msg = Contents::Fetch(FetchContents {key});
         self.send_request(msg)
     }
 
+    /// Set the value of a key after the mapper thread has been spawned.
     pub fn set(&self, key: K, data: T) -> impl Future< Item = MapperReply<T>, Error = String> {
         let msg = Contents::Place(PlaceContents {key, data});
             self.send_request(msg)
     }
 
+    /// Spawns a thread that receives and sends message in order to pass state around.
+    ///
+    /// After calling this function the mapper will no longer own the HashMap, as it will
+    /// be given to the spawned thread.
     pub fn receive(&mut self) -> Result<impl Future<Item = (), Error = ()>, String> {
         let mut map = self.map.take().ok_or("Receive Future already created")?;
         let receiver = self.receiver.take().ok_or("Receive Future already created")?;

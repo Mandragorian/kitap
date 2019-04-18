@@ -33,6 +33,7 @@ impl Into<u16> for MessageType {
     }
 }
 
+/// A trait for struct that can be sent as a Kitap message.
 pub trait Message {
     fn get_type(&self) -> MessageType;
     fn get_contents(&self) -> Vec<u8>;
@@ -49,10 +50,12 @@ pub trait Message {
     }
 }
 
+/// A message for Fetch requests
 pub struct FetchMessage {
     hashes: Vec<Vec<u8>>,
 }
 
+/// A message for Place requests
 pub struct PlaceMessage
 {
     pub hash: Vec<u8>,
