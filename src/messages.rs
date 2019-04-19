@@ -4,12 +4,15 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::hash::HASH_SIZE;
 
+static NOTFOUND: [u8; 5] = [78, 84, 70, 78, 68];
+
 pub const MSG_HEADER_LEN: usize = 6;
 
 #[derive(Debug)]
 pub enum MessageType {
     Place,
     Fetch,
+    NotFound,
     Unknown
 }
 
@@ -28,6 +31,7 @@ impl Into<u16> for MessageType {
         match self {
             MessageType::Place => 0,
             MessageType::Fetch => 1,
+            MessageType::NotFound => 2,
             MessageType::Unknown => 255,
         }
     }
@@ -42,7 +46,7 @@ pub trait Message {
         let msg_type = self.get_type();
         let contents = self.get_contents();
         let len = contents.len();
-        let mut v = Vec::with_capacity(len);
+        let mut v = Vec::with_capacity(2 + len);
         v.write_u16::<LittleEndian>(msg_type.into()).unwrap();
         v.write_u32::<LittleEndian>(len as u32).unwrap();
         v.extend(contents);
@@ -114,5 +118,27 @@ impl Message for PlaceMessage
         v.extend(&self.hash);
         v.write_u32::<LittleEndian>(self.datasize as u32).unwrap();
         v
+    }
+}
+
+pub struct NotFoundMessage<'a> {
+    key: &'a Vec<u8>,
+}
+
+impl<'a> NotFoundMessage<'a> {
+    pub fn new(key: &Vec<u8>) -> NotFoundMessage {
+        NotFoundMessage {
+            key,
+        }
+    }
+}
+
+impl<'a> Message for NotFoundMessage<'a> {
+    fn get_type(&self) -> MessageType {
+        MessageType::NotFound
+    }
+
+    fn get_contents(&self) -> Vec<u8> {
+        self.key.clone()
     }
 }

@@ -16,19 +16,18 @@ use log::{info, debug, trace};
 use kitap::mapper::{Mapper, MapperReply};
 use kitap::utils::{SharedBuffer, BoxedFuture};
 use kitap::utils::{create_base_app, setup_logging};
-use kitap::messages::{MessageType, PlaceMessage};
+use kitap::messages::{MessageType, PlaceMessage, NotFoundMessage, Message};
 use kitap::messages::{MSG_HEADER_LEN};
 
 type VecVecMapper = Mapper<Vec<u8>, Vec<u8>>;
 
-const NOTFOUND: [u8; 9] = [5, 0, 0, 0, 78, 84, 70, 78, 68];
 const ERROR: [u8; 9] = [5, 0, 0, 0, 69, 82, 82, 79, 82];
 
-fn process_fetch(cloned_mapper: Arc<VecVecMapper>, buf: Vec<u8>, wx: tokio::io::WriteHalf<TcpStream>) -> BoxedFuture<(), String> {
-    let key = buf;
-    info!("Received fetch message for key: {}", encode(&key));
-    Box::new(cloned_mapper.get(key)
-        .and_then(|reply| {
+fn process_fetch(cloned_mapper: Arc<VecVecMapper>, key: Vec<u8>, wx: tokio::io::WriteHalf<TcpStream>) -> BoxedFuture<(), String> {
+    let arc_key = Arc::new(key);
+    info!("Received fetch message for key: {}", encode(arc_key.as_ref()));
+    Box::new(cloned_mapper.get(arc_key.clone())
+        .and_then(move |reply| {
             debug!("Got reply from mapper {:?}", reply);
             let w = match reply {
                 MapperReply::Data(r) => {
@@ -38,7 +37,13 @@ fn process_fetch(cloned_mapper: Arc<VecVecMapper>, buf: Vec<u8>, wx: tokio::io::
                     trace!("Retrieved data {}", encode(&v));
                     SharedBuffer::new(Arc::new(v))
                 },
-                MapperReply::NotFound => SharedBuffer::new(Arc::new(NOTFOUND.to_vec())),
+                MapperReply::NotFound => {
+                    let cloned_key = arc_key.clone();
+                    let m = NotFoundMessage::new(cloned_key.as_ref());
+                    let bytes = Arc::new(m.into_bytes());
+                    debug!("Sending: {:?}", bytes);
+                    SharedBuffer::new(bytes)
+                },
                 _ => SharedBuffer::new(Arc::new(ERROR.to_vec())),
             };
             write_all(wx, w)

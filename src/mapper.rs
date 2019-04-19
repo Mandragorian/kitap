@@ -45,7 +45,7 @@ enum Contents<K, T>
 where
     K: std::hash::Hash + std::cmp::Eq,
 {
-    Fetch(FetchContents<K>),
+    Fetch(FetchContents<Arc<K>>),
     Place(PlaceContents<K, T>),
 }
 
@@ -124,7 +124,7 @@ where
     }
 
     /// Get the value of a key after the mapper thread has been spawned.
-    pub fn get(&self, key: K) -> impl Future< Item = MapperReply<T>, Error = String> {
+    pub fn get(&self, key: Arc<K>) -> impl Future< Item = MapperReply<T>, Error = String> {
         let msg = Contents::Fetch(FetchContents {key});
         self.send_request(msg)
     }

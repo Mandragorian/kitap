@@ -59,18 +59,23 @@ fn fetch(addr: SocketAddr, matches: &ArgMatches) -> Result<DHTJob, String> {
             w
         })
         .and_then(|(rx, _wx)| {
-            let mut buf = Vec::with_capacity(4);
-            buf.resize(4, 0);
+            let mut buf = Vec::with_capacity(6);
+            buf.resize(6, 0);
             let r = read_exact(rx, buf)
                 .map_err(|_| eprintln!("failed to receive bytes"))
                 .and_then(|(rx, buf)| {
                     let mut cursor = Cursor::new(buf);
-                    let length = cursor.read_u32::<LittleEndian>().unwrap() as usize;
+                    let _typ = cursor.read_u16::<LittleEndian>().expect("read type") as usize;
+                    let length = cursor.read_u32::<LittleEndian>().expect("read length") as usize;
                     let mut buf = Vec::with_capacity(length);
                     buf.resize(length, 0);
                     read_exact(rx, buf)
                         .map_err(|e| eprintln!("could not read response {}", e))
-                        .map(|(_, buf)| println!("{}", String::from_utf8(buf).unwrap()))
+                        .map(|(_, buf)| {
+                            let mut message = "Not Found: ".to_string();
+                            message.extend(encode(buf).chars());
+                            println!("{}", message)
+                        })
                 });
             tokio::spawn(r)
         });
